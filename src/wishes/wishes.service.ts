@@ -1,26 +1,130 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Wish } from './entities/wish.entity';
+import { User } from '../users/entities/user.entity';
 import { CreateWishDto } from './dto/create-wish.dto';
 import { UpdateWishDto } from './dto/update-wish.dto';
 
 @Injectable()
 export class WishesService {
-  create(createWishDto: CreateWishDto) {
-    return 'This action adds a new wish';
+  constructor(
+    @InjectRepository(Wish)
+    private readonly wishRepository: Repository<Wish>,
+  ) {}
+
+  // Create a wish
+  async create(owner: User, createWishDto: CreateWishDto): Promise<Wish> {
+    const wish = await this.wishRepository.create({ ...createWishDto, owner });
+
+    return this.wishRepository.save(wish);
   }
 
-  findAll() {
-    return `This action returns all wishes`;
+  // Find wish by id
+  async findOne(id: number): Promise<Wish> {
+    const wish = await this.wishRepository.findOne({
+      where: { id },
+      relations: { offers: true, owner: true },
+    });
+    if (!wish) {
+      throw new NotFoundException('Wish is not found');
+    }
+    return wish;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} wish`;
+  // Find all wishes
+  async findAll(): Promise<Wish[]> {
+    return await this.wishRepository.find();
   }
 
-  update(id: number, updateWishDto: UpdateWishDto) {
-    return `This action updates a #${id} wish`;
+  // Find wishes
+  async findWishes(item): Promise<Wish[]> {
+    return await this.wishRepository.findBy(item);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} wish`;
+  // Update wish
+  async updateOne(
+    wishId: number,
+    updateWishDto: UpdateWishDto,
+    userId: number,
+  ) {
+    const wish = await this.findOne(wishId);
+
+    if (!wish) {
+      throw new NotFoundException('Wish is not found');
+    }
+
+    if (userId !== wish.owner.id) {
+      throw new ForbiddenException('You can only update your wishes');
+    }
+
+    if (wish.raised && updateWishDto.price > 0) {
+      throw new ForbiddenException(
+        'You cannot update price since you already have offers',
+      );
+    }
+
+    return await this.wishRepository.update(wishId, {
+      ...updateWishDto,
+      updatedAt: new Date(),
+    });
+  }
+
+  // Delete wish
+  async removeOne(wishId: number, userId: number) {
+    const wish = await this.findOne(wishId);
+
+    if (!wish) {
+      throw new NotFoundException('Wish is not found');
+    }
+    if (userId !== wish.owner.id) {
+      throw new ForbiddenException('You can only delete your wishes');
+    }
+    return await this.wishRepository.delete(wishId);
+  }
+
+  // Copy wish
+  async copyWish(wishId: number, user: User) {
+    const wish = await this.findOne(wishId);
+
+    if (!wish) {
+      throw new NotFoundException('Wish is not found');
+    }
+    if (user.id === wish.owner.id) {
+      throw new ForbiddenException('You cannot copy your wishes');
+    }
+
+    await this.wishRepository.update(wishId, {
+      copied: (wish.copied = wish.copied + 1),
+    });
+
+    await this.create(user, {
+      ...wish,
+      raised: 0,
+    });
+  }
+
+  // Find the last 40 wishes
+  async lastWishes(): Promise<Wish[]> {
+    return await this.wishRepository.find({
+      take: 40,
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  // Get the last top 20 wishes
+  async topWishes(): Promise<Wish[]> {
+    return await this.wishRepository.find({
+      take: 20,
+      order: { copied: 'DESC' },
+    });
+  }
+
+  async find(arg: any) {
+    return await this.wishRepository.find(arg);
   }
 }

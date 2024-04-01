@@ -7,7 +7,6 @@ import { WishesModule } from './wishes/wishes.module';
 import { OffersModule } from './offers/offers.module';
 import { AuthModule } from './auth/auth.module';
 import { typeOrmConfig } from './config/config';
-import { StudentsModule } from './students/students.module';
 
 @Module({
   imports: [
@@ -17,7 +16,6 @@ import { StudentsModule } from './students/students.module';
     WishesModule,
     OffersModule,
     AuthModule,
-    StudentsModule,
   ],
   providers: [AppService],
 })
