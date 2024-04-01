@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -23,6 +24,14 @@ export class UsersService {
 
   // Create new user
   async create(сreateUserDto: CreateUserDto): Promise<User> {
+    const existingUser = await this.userRepository.findOne({
+      where: { email: сreateUserDto.email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('User with this email is already registered');
+    }
+
     const user = this.userRepository.create(сreateUserDto);
     const { password, ...result } = user;
     const hash = await hashHelpers.createHash(password);
