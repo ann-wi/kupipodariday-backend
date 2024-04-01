@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -91,9 +92,14 @@ export class WishesService {
   async copyWish(wishId: number, user: User) {
     const wish = await this.findOne(wishId);
 
+    if (wish.owner.id === user.id) {
+      throw new ConflictException('You already copied this wish');
+    }
+
     if (!wish) {
       throw new NotFoundException('Wish is not found');
     }
+
     if (user.id === wish.owner.id) {
       throw new ForbiddenException('You cannot copy your wishes');
     }
